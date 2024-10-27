@@ -46,7 +46,7 @@ if (process.env.USE_ACTIONS) {
             const buf = await fetch(downloadUrl).then(e => e.ok ? e.arrayBuffer() : undefined);
             if (buf) {
                 fs.writeFile(path, Buffer.from(buf));
-                console.log('downloaded database');
+                console.log(`downloaded database from ${getReleaseResponse.data[0].name}}`);
             } else {
                 console.log('not ok');
             }
@@ -164,21 +164,21 @@ for (const item of feed.items.filter(e => e.guid && !existingGuids.has(e.guid)))
         } : undefined
     });
 
-    //await bot.post({
-    //    createdAt: new Date(item.pubDate!),
-    //    text: '',
-    //    // text: new RichtextBuilder()
-    //    //     .addLink((item.title ?? item.link)?.trim()!, item.link?.trim()!),
-    //    external: {
-    //        title: item.title?.trim()!,
-    //        description: item.description?.trim()!,
-    //        uri: item.link?.trim()!,
-    //        thumb: item.enclosure ? {
-    //            data: await fetchAndCompress(item.enclosure?.url?.trim()!),
-    //            alt: (item['media:content']?.['media:text'] ?? item['media:content']?.['media:title'])?.join('')?.trim()
-    //        } : undefined
-    //    },
-    //});
+    await bot.post({
+        createdAt: new Date(item.pubDate!),
+        text: '',
+        // text: new RichtextBuilder()
+        //     .addLink((item.title ?? item.link)?.trim()!, item.link?.trim()!),
+        external: {
+            title: item.title?.trim()!,
+            description: item.description?.trim()!,
+            uri: item.link?.trim()!,
+            thumb: item.enclosure ? {
+                data: await fetchAndCompress(item.enclosure?.url?.trim()!),
+                alt: (item['media:content']?.['media:text'] ?? item['media:content']?.['media:title'])?.join('')?.trim()
+            } : undefined
+        },
+    });
 
     await db.insertInto('entries').values({ guid: item.guid! }).executeTakeFirstOrThrow();
 }
