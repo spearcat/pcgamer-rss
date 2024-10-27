@@ -129,11 +129,55 @@ async function fetchAndCompress(uri: string) {
 
 
     if (!process.env.CJPEGLI_PATH) {
-        return new Blob([
-            await sharp(buf)
-                .jpeg({ mozjpeg: true, quality: 80 })
-                .toBuffer()
-        ], {type: 'image/jpeg'});
+        let packedBuf;
+
+        let quality = 95;
+        do {
+            packedBuf = await sharp(buf)
+                .rotate()
+                .jpeg({ mozjpeg: true, quality })
+                .toBuffer();
+
+            quality -= 5;
+        } while (packedBuf.byteLength > 1000000 && quality > 60);
+
+        // try 2 1024px;
+        if (packedBuf.byteLength > 1000000) {
+            quality = 95;
+
+            do {
+                packedBuf = await sharp(buf)
+                    .rotate()
+                    .resize({
+                        width: 1024,
+                        withoutEnlargement: true
+                    })
+                    .jpeg({ mozjpeg: true, quality })
+                    .toBuffer();
+
+                quality -= 5;
+            } while (packedBuf.byteLength > 1000000 && quality > 60);
+        }
+
+        // 512px
+        if (packedBuf.byteLength > 1000000) {
+            quality = 95;
+
+            do {
+                packedBuf = await sharp(buf)
+                    .rotate()
+                    .resize({
+                        width: 512,
+                        withoutEnlargement: true
+                    })
+                    .jpeg({ mozjpeg: true, quality })
+                    .toBuffer();
+
+                quality -= 5;
+            } while (packedBuf.byteLength > 1000000 && quality > 60);
+        }
+
+        return new Blob([packedBuf], {type: 'image/jpeg'});
     } else {
         const tmpdir = await fs.mkdtemp(osPath.join(os.tmpdir(), 'bsky-image-processor-'));
         await fs.writeFile(osPath.join(tmpdir, 'input.jpg'), Buffer.from(buf));
