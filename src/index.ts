@@ -19,10 +19,16 @@ if (process.env.USE_ACTIONS) {
 
     persister = new class ReleasesDatabasePersister extends DatabasePersister {
         async restoreDatabase(path: string): Promise<void> {
-            const getReleaseResponse = await octokit.rest.repos.getLatestRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-            });
+            let getReleaseResponse;
+            try {
+                getReleaseResponse = await octokit.rest.repos.getLatestRelease({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                });
+            } catch (err) {
+                console.error(`getReleaseResponse ${err}`);
+                return;
+            }
 
             if (getReleaseResponse.status != 200) {
                 console.log(`getReleaseResponse status ${getReleaseResponse.status}`);
