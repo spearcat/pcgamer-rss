@@ -25,6 +25,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+  
+    - uses: gautamkrishnar/keepalive-workflow@v2
+
     - uses: pnpm/action-setup@v4
       with:
         version: 9
