@@ -12,7 +12,6 @@ abstract class DatabasePersister {
 
 let persister: DatabasePersister;
 if (process.env.USE_ACTIONS) {
-    const { DefaultArtifactClient } = await import('@actions/artifact');
     const { context, getOctokit } = await import('@actions/github');
 
     const octokit = getOctokit(process.env.GITHUB_TOKEN!);
@@ -45,7 +44,7 @@ if (process.env.USE_ACTIONS) {
 
             const buf = await fetch(downloadUrl).then(e => e.ok ? e.arrayBuffer() : undefined);
             if (buf) {
-                fs.writeFile(path, Buffer.from(buf));
+                await fs.writeFile(path, Buffer.from(buf));
                 console.log(`downloaded database from ${getReleaseResponse.data[0].name}}`);
             } else {
                 console.log('not ok');
