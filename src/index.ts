@@ -21,7 +21,9 @@ if (process.env.USE_ACTIONS) {
         async restoreDatabase(path: string): Promise<void> {
             let getReleaseResponse;
             try {
-                getReleaseResponse = await octokit.rest.repos.getLatestRelease({
+                getReleaseResponse = await octokit.rest.repos.listReleases({
+                    per_page: 1,
+                    // page: 1,
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                 });
@@ -35,9 +37,9 @@ if (process.env.USE_ACTIONS) {
                 return;
             }
 
-            const downloadUrl = getReleaseResponse.data.assets.find(e => e.name == osPath.basename(path))?.browser_download_url
+            const downloadUrl = getReleaseResponse.data[0].assets.find(e => e.name == osPath.basename(path))?.browser_download_url
             if (!downloadUrl) {
-                console.log(`no downloadUrl for ${getReleaseResponse.data.name}`);
+                console.log(`no downloadUrl for ${getReleaseResponse.data[0].name}`);
                 return;
             }
 
