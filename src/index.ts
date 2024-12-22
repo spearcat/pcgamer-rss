@@ -137,6 +137,10 @@ async function fetchAndCompress(uri: string) {
     return new Blob([newBuf], {type: 'image/jpeg'});
 }
 
+for (const post of (await bot.getUserPosts(bot.profile.did)).posts) {
+    await post.delete();
+}
+
 for (const item of feed.items.filter(e => e.guid && !existingGuids.has(e.guid))) {
     console.log(`${item.title}: ${item.link}`);
 
@@ -154,25 +158,30 @@ for (const item of feed.items.filter(e => e.guid && !existingGuids.has(e.guid)))
         } : undefined
     });
 
-    await bot.post({
-        createdAt: new Date(item.pubDate!),
-        text: '',
-        // text: new RichtextBuilder()
-        //     .addLink((item.title ?? item.link)?.trim()!, item.link?.trim()!),
-        external: {
-            title: item.title?.trim()!,
-            description: item.description?.trim()!,
-            uri: item.link?.trim()!,
-            thumb: item.enclosure ? {
-                data: await fetchAndCompress(item.enclosure?.url?.trim()!),
-                alt: (item['media:content']?.['media:text'] ?? item['media:content']?.['media:title'])?.join('')?.trim()
-            } : undefined
-        },
-    });
+    //await bot.post({
+    //    createdAt: new Date(item.pubDate!),
+    //    text: '',
+    //    // text: new RichtextBuilder()
+    //    //     .addLink((item.title ?? item.link)?.trim()!, item.link?.trim()!),
+    //    external: {
+    //        title: item.title?.trim()!,
+    //        description: item.description?.trim()!,
+    //        uri: item.link?.trim()!,
+    //        thumb: item.enclosure ? {
+    //            data: await fetchAndCompress(item.enclosure?.url?.trim()!),
+    //            alt: (item['media:content']?.['media:text'] ?? item['media:content']?.['media:title'])?.join('')?.trim()
+    //        } : undefined
+    //    },
+    //});
 
     await db.insertInto('entries').values({ guid: item.guid! }).executeTakeFirstOrThrow();
 }
 
+console.log('destroying db');
 await db.destroy();
+console.log('destroyed db');
 
 await persister.persistDatabase('database.db');
+console.log('persisted db');
+
+process.exit(0);
