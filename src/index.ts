@@ -41,9 +41,13 @@ if (process.env.USE_ACTIONS) {
                 return;
             }
 
-            await fetch(downloadUrl)
-                .then(e => e.ok ? e.arrayBuffer() : undefined)
-                .then(e => e ? fs.writeFile(path, Buffer.from(e)) : undefined);
+            const buf = await fetch(downloadUrl).then(e => e.ok ? e.arrayBuffer() : undefined);
+            if (buf) {
+                fs.writeFile(path, Buffer.from(buf));
+                console.log('downloaded database');
+            } else {
+                console.log('not ok');
+            }
         }
 
         async persistDatabase(path: string): Promise<void> {
@@ -67,7 +71,7 @@ if (process.env.USE_ACTIONS) {
                 },
                 data: await fs.readFile(path),
                 name: osPath.basename(path),
-                label: "test",
+                label: osPath.basename(path),
             });
         }
     }
@@ -137,9 +141,9 @@ async function fetchAndCompress(uri: string) {
     return new Blob([newBuf], {type: 'image/jpeg'});
 }
 
-for (const post of (await bot.getUserPosts(bot.profile.did)).posts) {
-    await post.delete();
-}
+//for (const post of (await bot.getUserPosts(bot.profile.did)).posts) {
+//    await post.delete();
+//}
 
 for (const item of feed.items.filter(e => e.guid && !existingGuids.has(e.guid))) {
     console.log(`${item.title}: ${item.link}`);
