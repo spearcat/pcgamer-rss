@@ -114,6 +114,7 @@ const existingGuids = new Set((await db
 ).map(e => e.guid));
 
 import { exec, spawn, fork, execFile } from 'promisify-child-process';
+import sharp from 'sharp';
 
 async function fetchAndCompress(uri: string) {
     const fetched = await fetch(uri);
@@ -126,68 +127,77 @@ async function fetchAndCompress(uri: string) {
     if (buf.byteLength <= 1000000) // https://github.com/bluesky-social/atproto/blob/09656d6db548d18da88ff580aab70a848613584f/lexicons/app/bsky/embed/images.json#L24C22-L24C29
         return blob;
 
-    const tmpdir = await fs.mkdtemp(osPath.join(os.tmpdir(), 'bsky-image-processor-'));
-    await fs.writeFile(osPath.join(tmpdir, 'input.jpg'), Buffer.from(buf));
-    const procOutput = process.env.CJPEGLI_PATH
-        ? await execFile(process.env.CJPEGLI_PATH, ['-v', '-q', '80', osPath.join(tmpdir, 'input.jpg'), osPath.join(tmpdir, 'output.jpg')])
-        : await execFile((await import('mozjpeg')).default, ['-outfile', osPath.join(tmpdir, 'output.jpg'), '-quality', '80', osPath.join(tmpdir, 'input.jpg')]);
-    console.log(procOutput.stdout);
-    console.error(procOutput.stderr);
-    if (procOutput.code != 0) {
-        throw new Error(`Exited with code ${procOutput.code}`);
+
+    if (!process.env.CJPEGLI_PATH) {
+        return new Blob([
+            await sharp(buf)
+                .jpeg({ mozjpeg: true, quality: 80 })
+                .toBuffer()
+        ], {type: 'image/jpeg'});
+    } else {
+        const tmpdir = await fs.mkdtemp(osPath.join(os.tmpdir(), 'bsky-image-processor-'));
+        await fs.writeFile(osPath.join(tmpdir, 'input.jpg'), Buffer.from(buf));
+        const procOutput = await execFile(process.env.CJPEGLI_PATH, ['-v', '-q', '80', osPath.join(tmpdir, 'input.jpg'), osPath.join(tmpdir, 'output.jpg')]);
+        console.log(procOutput.stdout);
+        console.error(procOutput.stderr);
+        if (procOutput.code != 0) {
+            throw new Error(`Exited with code ${procOutput.code}`);
+        }
+
+        const newBuf = await fs.readFile(osPath.join(tmpdir, 'output.jpg'));
+        await fs.rm(tmpdir, {recursive: true});
+
+        return new Blob([newBuf], {type: 'image/jpeg'});
     }
-
-    const newBuf = await fs.readFile(osPath.join(tmpdir, 'output.jpg'));
-    await fs.rm(tmpdir, {recursive: true});
-
-    return new Blob([newBuf], {type: 'image/jpeg'});
 }
 
 //for (const post of (await bot.getUserPosts(bot.profile.did)).posts) {
 //    await post.delete();
 //}
 
-for (const item of feed.items.filter(e => e.guid && !existingGuids.has(e.guid))) {
-    console.log(`${item.title}: ${item.link}`);
+try {
+    for (const item of feed.items.filter(e => e.guid && !existingGuids.has(e.guid))) {
+        console.log(`${item.title}: ${item.link}`);
 
-    console.log({
-        createdAt: new Date(item.pubDate!),
-        // text: new RichtextBuilder()
-        //     .addLink((item.title ?? item.link)?.trim()!, item.link?.trim()!)
-        //     .build(),
-        title: item.title?.trim()!,
-        description: item.description?.trim()!,
-        uri: item.link?.trim()!,
-        thumb: item.enclosure ? {
-            data: item.enclosure?.url?.trim(),
-            alt: (item['media:content']?.['media:text'] ?? item['media:content']?.['media:title'])?.join('')?.trim()
-        } : undefined
-    });
-
-    await bot.post({
-        createdAt: new Date(item.pubDate!),
-        text: '',
-        // text: new RichtextBuilder()
-        //     .addLink((item.title ?? item.link)?.trim()!, item.link?.trim()!),
-        external: {
+        console.log({
+            createdAt: new Date(item.pubDate!),
+            // text: new RichtextBuilder()
+            //     .addLink((item.title ?? item.link)?.trim()!, item.link?.trim()!)
+            //     .build(),
             title: item.title?.trim()!,
             description: item.description?.trim()!,
             uri: item.link?.trim()!,
             thumb: item.enclosure ? {
-                data: await fetchAndCompress(item.enclosure?.url?.trim()!),
+                data: item.enclosure?.url?.trim(),
                 alt: (item['media:content']?.['media:text'] ?? item['media:content']?.['media:title'])?.join('')?.trim()
             } : undefined
-        },
-    });
+        });
 
-    await db.insertInto('entries').values({ guid: item.guid! }).executeTakeFirstOrThrow();
+        await bot.post({
+            createdAt: new Date(item.pubDate!),
+            text: '',
+            // text: new RichtextBuilder()
+            //     .addLink((item.title ?? item.link)?.trim()!, item.link?.trim()!),
+            external: {
+                title: item.title?.trim()!,
+                description: item.description?.trim()!,
+                uri: item.link?.trim()!,
+                thumb: item.enclosure ? {
+                    data: await fetchAndCompress(item.enclosure?.url?.trim()!),
+                    alt: (item['media:content']?.['media:text'] ?? item['media:content']?.['media:title'])?.join('')?.trim()
+                } : undefined
+            },
+        });
+
+        await db.insertInto('entries').values({ guid: item.guid! }).executeTakeFirstOrThrow();
+    }
+} finally {
+    console.log('destroying db');
+    await db.destroy();
+    console.log('destroyed db');
+
+    await persister.persistDatabase('database.db');
+    console.log('persisted db');
 }
-
-console.log('destroying db');
-await db.destroy();
-console.log('destroyed db');
-
-await persister.persistDatabase('database.db');
-console.log('persisted db');
 
 process.exit(0);
