@@ -116,7 +116,9 @@ async function fetchAndCompress(uri: string) {
 
     const tmpdir = await fs.mkdtemp(osPath.join(os.tmpdir(), 'bsky-image-processor-'));
     await fs.writeFile(osPath.join(tmpdir, 'input.jpg'), Buffer.from(buf));
-    const procOutput = await execFile(process.env.CJPEGLI_PATH!, ['-v', '-q', '80', osPath.join(tmpdir, 'input.jpg'), osPath.join(tmpdir, 'output.jpg')]);
+    const procOutput = process.env.CJPEGLI_PATH
+        ? await execFile(process.env.CJPEGLI_PATH, ['-v', '-q', '80', osPath.join(tmpdir, 'input.jpg'), osPath.join(tmpdir, 'output.jpg')])
+        : await execFile((await import('mozjpeg')).default, ['-outfile', osPath.join(tmpdir, 'output.jpg'), '-quality', '80', osPath.join(tmpdir, 'input.jpg')]);
     console.log(procOutput.stdout);
     console.error(procOutput.stderr);
     if (procOutput.code != 0) {
